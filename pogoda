@@ -1,0 +1,367 @@
+```{r}
+
+#NIEZBEDNE PAKIETY
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(zoo)
+
+```
+
+```{r}
+# załadowanie danych
+pogoda <- read_csv("pogoda.csv", show_col_types = FALSE)
+
+```
+
+
+```{r}
+# sprawdzenie nazw kolumn
+colnames(pogoda)
+
+```
+
+
+```{r}
+# zdefiniowanie poprawnych nazw kolumn
+correct_column_names <- c("No", "year", "month", "day", "hour", "pm2.5", "DEWP", "TEMP", "PRES", "cbwd", "Iws", "Is", "Ir")
+
+# nadanie kolumnom prawidłowe nazwy
+if (any(colnames(pogoda) == "")) {
+  colnames(pogoda) <- correct_column_names
+}
+
+```
+
+```{r}
+# Sprawdzanie struktury i kilka pierwszych wierszy danych
+glimpse(pogoda)
+head(pogoda)
+
+```
+
+```{r}
+# sprawdzaanie brakujacych wartosci
+summary(pogoda)
+
+# Uzupełnianie brakujące wartości w pm2,5 za pomocą interpolacji liniowej
+pogoda <- pogoda %>%
+  mutate(pm2.5 = ifelse(is.na(pm2.5), zoo::na.approx(pm2.5, na.rm = FALSE), pm2.5))
+
+```
+
+```{r}
+# stworzenie kolumny datetime: year, month, day, and hour
+pogoda <- pogoda %>%
+  mutate(datetime = make_datetime(year, month, day, hour))
+
+# Sprawdzenie wynikową ramkę danych
+glimpse(pogoda)
+
+```
+
+```{r}
+# Usuniencie wierszy z pozostałymi brakującymi wartościami
+pogoda <- pogoda %>%
+  drop_na()
+
+```
+
+```{r}
+# Utwórzenie podsumowania średniej miesięcznej temperatury i pm2,
+monthly_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_temp = mean(TEMP, na.rm = TRUE),
+    avg_pm25 = mean(pm2.5, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+
+head(monthly_summary)
+
+```
+
+```{r}
+#  podsumowanie średniej miesięcznej temperatury i pm2,5
+monthly_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_temp = mean(TEMP, na.rm = TRUE),
+    avg_pm25 = mean(pm2.5, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+head(monthly_summary)
+
+```
+```{r}
+# Wykres średnią miesięczną temperaturę
+ggplot(monthly_summary, aes(x = month, y = avg_temp, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Temperature in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Temperature (°C)", color = "Year") +
+  theme_minimal()
+
+```
+
+```{r}
+# Wykres średniomiesięczna pm2,5
+ggplot(monthly_summary, aes(x = month, y = avg_pm25, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly PM2.5 in Hong Kong (2010-2014)",
+       x = "Month", y = "Average PM2.5 (µg/m³)", color = "Year") +
+  theme_minimal()
+
+```
+
+```{r}
+#  średnie roczne
+annual_summary <- pogoda %>%
+  group_by(year = year(datetime)) %>%
+  summarise(
+    avg_annual_temp = mean(TEMP, na.rm = TRUE),
+    avg_annual_pm25 = mean(pm2.5, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Wykres sredniej rocznej temerpatur
+ggplot(annual_summary, aes(x = year, y = avg_annual_temp)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Average Annual Temperature in Hong Kong (2010-2014)",
+       x = "Year", y = "Average Temperature (°C)") +
+  theme_minimal()
+
+# Wykres średniej rocznej PM2,5
+ggplot(annual_summary, aes(x = year, y = avg_annual_pm25)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Average Annual PM2.5 in Hong Kong (2010-2014)",
+       x = "Year", y = "Average PM2.5 (µg/m³)") +
+  theme_minimal()
+
+```
+
+```{r}
+#  miesięczny średni punkt rosy
+monthly_dewp_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_dewp = mean(DEWP, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Wykres miesiecnzy punkt rosy
+ggplot(monthly_dewp_summary, aes(x = month, y = avg_dewp, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Dew Point in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Dew Point (°C)", color = "Year") +
+  theme_minimal()
+
+
+
+monthly_dewp_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_dewp = mean(DEWP, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# wykres miesieczny sredni punkt rosy
+dew_point_plot <- ggplot(monthly_dewp_summary, aes(x = month, y = avg_dewp, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Dew Point in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Dew Point (°C)", color = "Year") +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+# srednie miesieczne cisnienie
+monthly_pres_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_pres = mean(PRES, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# wykre srednie miesieczne cisnienie
+ggplot(monthly_pres_summary, aes(x = month, y = avg_pres, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Pressure in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Pressure (hPa)", color = "Year") +
+  theme_minimal()
+
+
+
+
+# srednie miesieczne cisnienie
+monthly_pres_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_pres = mean(PRES, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# wykre srednie miesieczne cisnienie
+pressure_plot <- ggplot(monthly_pres_summary, aes(x = month, y = avg_pres, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Pressure in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Pressure (hPa)", color = "Year") +
+  theme_minimal()
+
+
+# Save plot
+ggsave("average_monthly_pressure.png", plot = pressure_plot, width = 8, height = 6)
+
+
+```
+
+```{r}
+# średnia miesieczna predkosc wiatru
+monthly_wind_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_wind = mean(Iws, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# wykres sredniej miesiecznej predkosci wiatru
+ggplot(monthly_wind_summary, aes(x = month, y = avg_wind, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Wind Speed in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Wind Speed (m/s)", color = "Year") +
+  theme_minimal()
+
+
+# srednia miesieczna predkosc wiatru
+monthly_wind_summary <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime, label = TRUE)) %>%
+  summarise(
+    avg_wind = mean(Iws, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# wykkres sredniej miesiecznej predkosci wiatru
+ggplot(monthly_wind_summary, aes(x = month, y = avg_wind, group = year, color = as.factor(year))) +
+  geom_line() +
+  labs(title = "Average Monthly Wind Speed in Hong Kong (2010-2014)",
+       x = "Month", y = "Average Wind Speed (m/s)", color = "Year") +
+  theme_minimal()
+
+
+
+
+```
+
+```{r}
+#Wykres rozkładu kierunku wiatru
+ggplot(pogoda, aes(x = cbwd)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Wind Direction Distribution in Hong Kong (2010-2014)",
+       x = "Wind Direction", y = "Count") +
+  theme_minimal()
+
+
+
+
+
+```
+
+```{r}
+# Wykres punktowy temperatury w funkcji pm2,5
+ggplot(pogoda, aes(x = TEMP, y = pm2.5)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Relationship between Temperature and PM2.5 in Hong Kong (2010-2014)",
+       x = "Temperature (°C)", y = "PM2.5 (µg/m³)") +
+  theme_minimal()
+
+#  punktowy temperatury w funkcji pm2,5
+temp_pm25_plot <- ggplot(pogoda, aes(x = TEMP, y = pm2.5)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Relationship between Temperature and PM2.5 in Hong Kong (2010-2014)",
+       x = "Temperature (°C)", y = "PM2.5 (µg/m³)") +
+  theme_minimal()
+
+
+
+
+```
+
+```{r}
+# Wykres pudełkowy temperatury według miesiąca
+ggplot(pogoda, aes(x = factor(month(datetime, label = TRUE)), y = TEMP)) +
+  geom_boxplot() +
+  labs(title = "Monthly Temperature Distribution in Hong Kong (2010-2014)",
+       x = "Month", y = "Temperature (°C)") +
+  theme_minimal()
+# Wykres pudełkowy temperatury według miesiąca
+boxplot_temp_plot <- ggplot(pogoda, aes(x = factor(month(datetime, label = TRUE)), y = TEMP)) +
+  geom_boxplot() +
+  labs(title = "Monthly Temperature Distribution in Hong Kong (2010-2014)",
+       x = "Month", y = "Temperature (°C)") +
+  theme_minimal()
+
+
+
+```
+
+```{r}
+# przygotowanie danych do heatmapy
+heatmap_data <- pogoda %>%
+  group_by(year = year(datetime), month = month(datetime)) %>%
+  summarise(avg_temp = mean(TEMP, na.rm = TRUE), .groups = "drop") %>%
+  mutate(month = factor(month, levels = 1:12, labels = month.name))
+
+# heatmap
+heatmap_temp_plot <- ggplot(heatmap_data, aes(x = month, y = year, fill = avg_temp)) +
+  geom_tile() +
+  scale_fill_gradient(low = "blue", high = "red") +
+  labs(title = "Monthly Average Temperature Heatmap in Hong Kong (2010-2014)",
+       x = "Month", y = "Year", fill = "Avg Temp (°C)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+```
+
+```{r}
+
+```
+
+
+```{r}
+# zapisanie wykresow
+ggsave("average_monthly_temperature.png", plot = last_plot(), width = 8, height = 6)
+ggsave("average_monthly_pm25.png", plot = last_plot(), width = 8, height = 6)
+ggsave("average_annual_temperature.png", plot = last_plot(), width = 8, height = 6)
+ggsave("average_annual_pm25.png", plot = last_plot(), width = 8, height = 6)
+
+```
+
+```{r}
+#zapisanie wykresow
+ggsave("average_monthly_dew_point.png", plot = dew_point_plot, width = 8, height = 6)
+# Save plot
+ggsave("average_monthly_pressure.png", plot = pressure_plot, width = 8, height = 6)
+# Save plot
+ggsave("monthly_temp_heatmap.png", plot = heatmap_temp_plot, width = 8, height = 6)
+# Save plot
+ggsave("monthly_temp_boxplot.png", plot = boxplot_temp_plot, width = 8, height = 6)
+# Save plot
+ggsave("temp_vs_pm25.png", plot = temp_pm25_plot, width = 8, height = 6)
+# Save plot
+ggsave("wind_direction_distribution.png", plot = wind_direction_plot, width = 8, height = 6)
+
+# Save plot
+ggsave("average_monthly_wind_speed.png", plot = wind_speed_plot, width = 8, height = 6)
+```
+
+
